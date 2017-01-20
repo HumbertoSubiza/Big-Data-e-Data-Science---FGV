@@ -1,0 +1,552 @@
+---
+title: "Análise da ST VVCVA  - IBGE"
+author: "Walter Humberto Subiza Pina"
+date: "9 de dezembro de 2016"
+output: html_document
+---
+
+
+--------------------------------------------------------------------
+
+
+#Análise de serie temporal do IBGE sobre o volume de vendas do comercio varejista ampliado - VVCVA. 
+
+
+--------------------------------------------------------------------
+
+
+### Sumário
+
+1. Introdução
+
+2. Análise da ST
+
+    + Especificação
+  
+    + Identificação
+  
+    + Estimação
+  
+    + Diagnóstico
+  
+    + Previsão
+  
+3. Conclusões
+
+---------------------------------------------------------
+
+---------------------------------------------------------
+
+
+##1. Introdução
+
+
+  A série temporal foi extraída em 02/12/2016 da página do IBGE, disponível em:
+ <http://seriesestatisticas.ibge.gov.br/series.aspx?no=2&op=0&vcodigo=MC67&t=volume-vendas-comercio-varejista-ampliado-tipos>.
+ 
+ 
+ Contem o _volume de vendas mensal_, contabilizado entre _Janeiro de 2003 e dezembro de 2011_, usando _índice de base fixa com 2003=100_.
+ 
+ 
+**O propósito do análise é fazer uma previsão de vendas do comércio varejista para o ano de 2012.**
+
+ 
+---------------------------------------------------------
+
+
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+# carregando bibliotecas necessárias
+require(BETS)
+require(urca)
+require(TSA)
+require(forecast)
+require(normtest)
+require(FinTS)
+require(xlsx)
+require(dygraphs)
+require(nortest)
+require(plotly)
+```
+
+##2. Análise da ST
+
+
+###Especificação
+
+
+Vamos conhecer primeiro o comportamento da serie.
+
+
+```{r, echo=FALSE}
+# carregando arquivo de dados
+vendas <- read.csv("C:\\Users\\Walter Pina\\Documents\\FGV\\08 Séries Temporais - Pedro\\ST_markdown\\data\\IBGE_VVCVA.csv", 
+                   header=FALSE, 
+                   dec=".",
+                   stringsAsFactors = F)
+#transposição de linha a coluna em dataframe
+vendas2 <- as.data.frame(t(vendas))
+
+# transformação em serie temporal
+st_Vendas <- ts(vendas2, 
+                start     = c(2003,1), 
+                frequency = 12)
+```
+
+
+```{r echo=FALSE}
+ts.plot(st_Vendas, 
+        main= "Gráfico da série temporal de \nVendas  do comércio varejista ampliado",
+        xlab= "Tempo",
+        ylab= "Volume de vendas",
+        col = "blue")
+```
+
+
+
+No gráfico da série, nota-se variação sazonal muito semelhante até o ano de 2008, onde a partir do qual aparente pequenas irregularidades mas mantendo a variação sazonal. Isto parece coincidir com a _crise financieira de 2008_, o que poderia ter ocasionado variação no comportamento do padrão de gastos das famílias.
+
+
+Um gráfico interativo permite analisar melhor as variacoes da serie.
+
+
+
+
+
+```{r echo=FALSE}
+dygraph(st_Vendas)
+```
+
+
+--------------------------------------------------------------------
+
+
+ Gráfico para análise de médias e tendencia mensais. Note-se que dezembro tem a média de maior valor, fevereiro a de menor valor e o resto dos meses apresentam valores semelhantes.
+ 
+ 
+```{r echo=FALSE}
+monthplot(st_Vendas)
+```
+
+
+
+###Identificação
+
+
+**Decomposição da série nas principais componentes**
+
+Vamos decompor agora a série em tres partes principais e aditivas: tendencia, componente sazonal e residuo, esse último idealmente deveria ser residuo branco.
+
+
+```{r echo=FALSE}
+plot(decompose(st_Vendas))
+```
+
+
+Observa-se que o valor mínimo de vendas está proximo de 100 e o máximo de 190. A componente de _tendencia afeta fortemente_ a série (em torno de 70%). 
+
+A _componente sazonal presente na série_ afeta em torno de 25% e o _RB é de pequeno valor_ e não aparenta estar contaminado pela componente sazonal
+
+
+ Precisa-se modelar as componentes de tendencia e sazonal, o que amerita o uso do modelo **SARIMA**
+
+ Função de autocorrelação
+ 
+ Nóta-se que a série ainda nao é estacionaria, já que não tem decrescimento exponencial ou senoidal.
+ 
+ 
+```{r }
+BETS.corrgram(st_Vendas, 
+              lag.max = 36) # 36 = 3 anos
+```
+
+![correlograma da série](data/correlograma.png)
+
+
+
+ Testes de RU para determinação o número de diferenciações necessárias para transformar a ST em estacionária; usarei **ADF (Augmented Dickey Fuller)**.
+ 
+ 
+ 
+```{r}
+adf.drift1 <- ur.df(y          = st_Vendas, 
+                   type       = c("drift"),
+                   lags       = 24, 
+                   selectlags = "AIC")
+summary(adf.drift1)
+```
+
+
+Nota-se que as duas primeiras diferenciações tem alta significancia estatística.
+
+
+ Ao analisar a estatística de teste (tau2 = 1,367) notamos que seu valor é superior ao valor crítico associado ao nível de confiança de 95% (-2,88). 
+Dessa forma, conclui-se que a ST não é estacionária (não rejeição da hipotese nula)                                                              
+
+ Dado que a nossa ST é não estacionária, vamos tentar torná-la estacionária fazendo  uma diferenciação e vamos observar o gráfico e a FAC novamente.
+
+
+ Tornando a serie estacionaria...tirando a tendencia
+ 
+ 
+```{r, echo=FALSE}
+ts.plot(diff(st_Vendas, 
+             lag         = 1, 
+             differences = 1))
+```
+
+
+
+ A ST aparenta ser estacionária, a variancia tem um crescimento pequeno nos últimos anos, condicente com a teoria económica de crescimento. Vamos usar a funcao log para tirar o crescimento da variancia
+ 
+ 
+ 
+```{r} 
+ts.plot(diff(log(st_Vendas), 
+             lag         = 1, 
+             differences = 1))
+```
+
+
+Gráfico mostra agora a ST estacionária na média e na variancia, acorde a teoria de Box & Jenkins
+
+
+**Avaliando a estacionariedade da parte sazonal**
+
+
+```{r} 
+BETS.corrgram(diff(log (st_Vendas),
+                            lag         = 1, 
+                            differences = 1), 
+              lag.max = 60)
+# nota-se cortes nos lags 12, 24 e 36...
+```
+
+
+![correlograma das primeiras diferenças](data/correlograma2.png)
+
+Para tirar a sazonalidade, vamos diferenciar a série em forma simples primeiro e logo em períodos de 12 meses. O gráfico vai mostrar o resultado.
+
+```{r} 
+# diferença simples
+diff.simples <- diff(log(st_Vendas), 
+                             lag         = 1, 
+                             differences = 1)
+# diferença sazonal (12)
+diff.sazonal <- diff(diff.simples, 
+                     lag         =12, 
+                     differences = 1)
+
+ts.plot(diff.sazonal)
+
+```
+
+
+Correlograma para a série sem sazonalidade.
+
+```{r} 
+BETS.corrgram(diff.sazonal, 
+              lag.max = 36)
+```             
+
+
+
+![correlograma sem sazonalidade](data/correlograma3.png)
+
+
+Correlograma parcial com comprimento de 36 meses
+
+
+              
+```{r} 
+BETS.corrgram(diff.sazonal, 
+              lag.max = 36, 
+              type    = "partial")
+```
+
+
+![correlograma parcial sem sazonalidade](data/correlograma4.png)
+
+
+
+ Refazendo o teste de RU depois das tranformações
+ 
+ 
+
+```{r} 
+adf.drift2 <- ur.df(y = diff(diff(log(st_Vendas), 
+                                  lag = 1), 
+                            lag = 12),
+                    type       = "drift", 
+                    lags       = 24, 
+                    selectlags = "AIC")
+
+
+summary(adf.drift2)
+```
+
+
+ Teste de RU tau2= -2.972 é inferior ao valor crítico de -2.89, com 95% de probabilidade pelo que podemos concluir que a ST é estacionária 
+ 
+ 
+
+```{r} 
+
+acf(adf.drift2@res, 
+    lag.max    = 36, 
+    drop.lag.0 = T)
+```
+
+
+###Estimação : Modelado da ST com SARIMA
+
+
+Faremos primeiro uma estimação automática para ver a sugestão de modelo
+
+
+
+```{r} 
+auto.arima(st_Vendas)
+```
+
+
+**Sugestão de modelo: ARIMA(0,1,1)(0,1,2)[12], AIC=611.23**
+
+
+Vamos fazer primeiro a sugestão do ARIMA
+
+
+```{r} 
+fit.vendas1 <- Arima(st_Vendas,
+                    order    = c(0,1,1), 
+                    seasonal = c(0,1,2),
+                    lambda   = 0)
+summary(fit.vendas1)
+```
+
+
+
+ Resultados: AIC=-351.15   AICc=-350.71   BIC=-340.94
+
+ Teste de um outro modelo, com **sazonal = (0,1,1)**
+ 
+ 
+ 
+```{r} 
+fit.vendas2 <- Arima(st_Vendas, 
+                     order    = c(0,1,1), 
+                     seasonal = c(0,1,1),
+                     lambda   = 0)
+summary(fit.vendas2)
+```
+
+**Resultados: AIC=-347.34   AICc=-347.08   BIC=-339.68**
+
+Todos os indicadores apresentaram uma pequena melhoria, pelo que será adotado o segundo modelo. _Nos seguintes passos usaremos os dois modelos apenas com fins comparativos._
+
+
+
+
+```{r} 
+BETS.t_test(fit.vendas1) 
+BETS.t_test(fit.vendas2)
+
+accuracy(fit.vendas1)
+accuracy(fit.vendas2)# ver MAPE mean absolute percentage error 2,43% erro!!
+summary(fit.vendas2)
+```
+
+
+## Diagnóstico do modelo
+
+Precisamos verificar:
+
+  1- Ausência de autocorrelação linear;
+  
+  2- Ausência de heterocedasticidade condicional;
+  
+  3- Normalidade.
+  
+  
+```{r} 
+diag1 <- tsdiag(fit.vendas1, 
+                gof.lag = 36)
+
+diag2 <- tsdiag(fit.vendas2, 
+                gof.lag = 36)
+```
+
+
+**analise para diag2:**
+
+
+ 1- os dados aparentam estar distribuídos simetricamente em torno da média zero,  indicação de distribuição normal. Não temos nenhuma informação discrepante fora do intervalo [-3,3], apenas um dado em dez 2009;
+ 
+ 2- FAC dos resíduos sem presença de lags significantes;
+ 
+ 3- O valor de p do teste não rejeita a H0 e diminui significativamente após a desfazagem 14
+ 
+
+**1- Verificar a autocorrelação linear**
+
+
+```{r} 
+Box.test(x = fit.vendas1$residuals, 
+         lag = 24,
+         type = "Ljung-Box", 
+         fitdf = 2)
+
+Box.test(x = fit.vendas2$residuals, 
+         lag = 24,
+         type = "Ljung-Box", 
+         fitdf = 2)
+```
+
+
+ Analise para fit.vendas2
+ p-value = 0.04013; a 95% de confiança não rejeitamos a hipótese nula de não existência de autocorrelação serial até o lag 24.
+
+
+**2 - Ausência de heterocedasticidade condicional**;
+
+
+```{r} 
+ArchTest(fit.vendas1$residuals,
+         lags = 12)
+ArchTest(fit.vendas2$residuals,
+         lags = 12)
+```
+
+
+ **analise para fit.vendas2**
+
+Conforme mostrado pelo teste, a hipótese nula é que não há presença de efeito ARCH. Dessa forma, dado o valor do p-valor = 0.7398, não rejeitamos a hipótese nula a 95% de confiança, ou seja, a variância é estacionária.
+
+
+
+**Teste JB**
+
+```{r} 
+jb.norm.test(fit.vendas2$residuals, 
+             nrepl = 2000)
+```
+
+
+ p-value = 0.002; Como se vê o teste rejeita H0 de que a amostra provem de dist. normal
+ Vamos verificar qual das duas condições do teste é violada:
+
+ Curtosis
+ 
+ 
+```{r} 
+kurtosis.norm.test(fit.vendas2$residuals, 
+                   nrepl=2000)
+```
+
+
+ p-value = 0.0015, a curtosis é rejeitada
+
+
+ Simetria
+```{r} 
+skewness.norm.test(fit.vendas2$residuals, 
+                   nrepl=2000)
+```
+
+
+ p-value = 0.6495
+
+
+ A simetria é aceita ou seja os resíduos tem simetria mas não tem a curtose de 0 (3) necessária.
+
+
+----------------------------------------------------------------
+
+
+ **Normalidade dos resíduos - Observações**
+
+ O teste de Jarque-Bera para normalidade, verifica se a amostra de dados tem uma curtosis e simetria semelhante a uma distribuição normal. 
+ 
+ Se os dados vem de uma dist. normal, o teste JB tem, asintóticamente, uma distribuição chi-quadrado com dois graus de liberdade, e assim a estatística pode ser usada para verificar a hipótese H0, de que os dados provem de uma dist. normal.
+
+ A H0 do teste diz que a assimetria e a curtosis tem de ser zero (ou 3 para curtosis, que é o mesmo). Qualquer diferença com essa hipótese, incrementa o valor da estatística JB.
+
+ Para amostras pequenas de dados, a aproximação de chi-quadrado é muito sensível a variações, causando a rejeição ainda que H0 seja verdadeira e levando assim a erros do tipo I. 
+
+ Para um tamanho de amostra de aprox. 100 elementos o p-valor calculado equivalente ao verdadeiro nível de alfa é: 0.062 (valores aprox por simulação Monte Carlo).
+ 
+
+ **Teste de Lilliefors (Kolmogorov-Smirnov)**
+ 
+ 
+ Para amostras de tamanho pequeno (e maior a 4), o pacote nortest tem a função lillie.test - Lilliefors (Kolmogorov-Smirnov) para normalidade.
+
+
+```{r} 
+lillie.test(fit.vendas2$residuals)
+```
+
+
+
+ O valor p-value = 0.3277, estabelece que **não podemos rejeitar a hipótese de que a amostra de resíduos é normal**.
+
+ _Pelo número baixo de resíduos, aceita-se a hipótese de normalidade dos mesmos, por possívelmente estar em presença de um erro tipo I (rejeição quando H0 é verdadeira, ou falso positivo)._
+
+
+###Previsão
+
+ Assim sendo passamos a etapa da previsão de vendas para os próximos 12 meses, com nível de confiança de 95%
+ 
+ 
+ 
+```{r} 
+previsao <- forecast(fit.vendas2, 
+                     h    =12,        # 12 meses
+                     level=0.95)
+plot(previsao)
+```
+
+Finalmente vamos gravar a previsão em arquivos de formato csv e xls para distribuição dos interessados
+
+
+```{r} 
+write.csv(data.frame(previsao), "previsao_vendas.csv")
+write.xlsx(data.frame(previsao), "previsao_vendas.xlsx")
+```
+
+
+-------------------------------------------------------------------
+
+
+##3. Conclusões
+
+
+Foi feita uma análise de uma série temporal de vendas ao varejo, coletada pelo IBGE mensalmente entre 2003 e 2011. 
+
+A série apresentou tendencia crescente e sazonalidade de 12 meses, com valores máximos nos meses de dezembro e mínimos nos meses de fevereiro. 
+
+Também nota-se uma pequena variação no comportamento do sinal após 2008, que pode ser atribuído à crise económica de 2008.Todas essas observações são condicentes com a teoría económica.
+
+A série foi tratada pelo modelo integrado autoregressivo de médias móveis, acorde o método proposto por Box & Jenkins ( _Box, George; Jenkins, Gwilym (1970). Time Series Analysis: Forecasting and Control. San Francisco: Holden-Day_ ).
+
+
+O diagnóstico do modelo foi realizado com sucesso, mas a normalidade dos resíduos foi afetada pelo baixo número de dados. O teste de Lilliefors para amostras de baixo números, mostrou que os resíduos além de serem aleatórios, provem de uma distribuição semelhante à normal.
+
+
+Finalmente foi feita uma previssão a 12 meses, com 95% de confiança e os resultados salvos em dois arquivos de formato diferentes para sua distribuição.
+
+
+----------------------------
+
+
+###Créditos:
+
+
+O presente trabalho foi realizado como parte do curso **Big Data e Data Science da FGV- Turma 2016**; na disciplina _Séries Temporais_, ministrada pelo _Prof. Pedro Costa Ferreira_ (<https://github.com/pedrocostaferreira>).
+
+
+--------------------------------------------------------------------
+
+
+--------------------------------------------------------------------
+### Fim do script

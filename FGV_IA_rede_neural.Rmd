@@ -7,29 +7,29 @@ output:
 
 
 # Curso de Big Data e Data Science - FGV
-## MÛdulo de Inteligencia Artificial
-## Prof. JosÈ Francisco Moreira Pessanha
+## M√≥dulo de Inteligencia Artificial
+## Prof. Jos√© Francisco Moreira Pessanha
 ## Aluno Walter Humberto Subiza Pina
 
 #------------------------------------------------------------------------------
-## ExercÌcio de Redes Neurais
+## Exerc√≠cio de Redes Neurais
 
-**O propÛsito do exercÌcio È analisar uma sÈrie temporal de dados e fazer a partir desse an·lisse, uma previs„o de comportamento da vari·vel ‡ futuro.**
+**O prop√≥sito do exerc√≠cio √© analisar uma s√©rie temporal de dados e fazer a partir desse an√°lisse, uma previs√£o de comportamento da vari√°vel √† futuro.**
 
- A serie temporal È do IBGE e tem dados sobre o volume de vendas do comercio
+ A serie temporal √© do IBGE e tem dados sobre o volume de vendas do comercio
  varejista ampliado entre Janeiro de 2003 e Dezembro de 2011.
- O formato È arquivo texto, csv. 
+ O formato √© arquivo texto, csv. 
 
  Serie em:
- http://seriesestatisticas.ibge.gov.br/series.aspx?no=2&op=0&vcodigo=MC67&t=volume-vendas-comercio-varejista-ampliado-tipos , extraÌda em 02/12/2016
+ http://seriesestatisticas.ibge.gov.br/series.aspx?no=2&op=0&vcodigo=MC67&t=volume-vendas-comercio-varejista-ampliado-tipos , extra√≠da em 02/12/2016
 
 ------------------------------------------------------------------------------
 
-### Carregar pacotes necess·rios ao an·lise
+### Carregar pacotes necess√°rios ao an√°lise
  
  
 ```{r, echo=FALSE, message=FALSE}
-library (dygraphs)  # Gr·ficos dinamicos
+library (dygraphs)  # Gr√°ficos dinamicos
 library (neuralnet) # ROTINAS PARA REDE NEURAL
 ```
 
@@ -42,10 +42,10 @@ vendas <- read.csv("IBGE_VVCVA.csv",
                    header=FALSE, 
                    stringsAsFactors = F)
 
-#transposiÁ„o de linha a coluna em dataframe
+#transposi√ß√£o de linha a coluna em dataframe
 vendas2 <- as.data.frame(t(vendas))
 
-# transformaÁ„o em st_Vendas temporal
+# transforma√ß√£o em st_Vendas temporal
 st_Vendas <- ts(vendas2, 
                 start     = c(2003,1), 
                 frequency = 12)
@@ -56,7 +56,7 @@ st_Vendas <- ts(vendas2,
 
 #------------------------------------------------------------------------------
  
- Preparando a ST para an·lise
+ Preparando a ST para an√°lise
  
  
 ```{r}
@@ -68,7 +68,7 @@ plot (st_Vendas,
 
 
 Vamos analisar graficamente a sazonalidade e determinar os meses em que
-as variaÁıes s„o m·ximas e mÌnimas
+as varia√ß√µes s√£o m√°ximas e m√≠nimas
 
 
 
@@ -80,16 +80,16 @@ dygraph (st_Vendas)
 
 #------------------------------------------------------------------------------
 
-Se observa que a sÈrie tem uma **tendencia crescente** ao longo do tempo, com
-**variaÁ„o sazonal forte nos meses de dezembro e fevereiro** de cada ano
+Se observa que a s√©rie tem uma **tendencia crescente** ao longo do tempo, com
+**varia√ß√£o sazonal forte nos meses de dezembro e fevereiro** de cada ano
 
 
-Ao aplicar a funÁ„o log na sÈrie, vamos a estacionar a vari‚ncia primeiramente.
+Ao aplicar a fun√ß√£o log na s√©rie, vamos a estacionar a vari√¢ncia primeiramente.
 
 
 
 ```{r}
-# n˙mero de observaÁıes
+# n√∫mero de observa√ß√µes
 n <-  length(st_Vendas)
 
 # 
@@ -104,8 +104,8 @@ plot (logst_Vendas,
 
 
 
- A tendencia da sÈrie, ser· retirada fazendo uma diferenÁa entre observaÁıes
-com lag=1 e diferenÁas de primeira ordem
+ A tendencia da s√©rie, ser√° retirada fazendo uma diferen√ßa entre observa√ß√µes
+com lag=1 e diferen√ßas de primeira ordem
 
 
 
@@ -116,11 +116,11 @@ delta <- diff(logst_Vendas,lag = 1, differences = 1)
 plot (delta,
      xlab = "Anos",
      ylab = "log(Vendas)",
-     main = " SÈrie de Vendas apÛs retirada de tendÍncia ")
+     main = " S√©rie de Vendas ap√≥s retirada de tend√™ncia ")
 ```
 
 
- _NormalizaÁ„o da sÈrie_ para deixar ela entre 0 e 1
+ _Normaliza√ß√£o da s√©rie_ para deixar ela entre 0 e 1
 
 
 ```{r}
@@ -133,8 +133,8 @@ normalizado <- (delta-minimo)/(maximo-minimo)
 #------------------------------------------------------------------------------
  PREPARA CONJUNTO DE PADROES ENTRADA/SAIDA 
  
- Os lags definidos s„o o valor prÈvio (1), o segundo valor anterior (2), o quarto valor anterior (4) e o 12 valor anterior (12), caraterizando um modelo
- que leva em conta os dois meses anteriores, o valor do trimestre e do ano. O arquivo de saÌda vair ter 4 vari·veis explicativas (X1 a X4) e 1 de resposta (Y), exemplo:
+ Os lags definidos s√£o o valor pr√©vio (1), o segundo valor anterior (2), o quarto valor anterior (4) e o 12 valor anterior (12), caraterizando um modelo
+ que leva em conta os dois meses anteriores, o valor do trimestre e do ano. O arquivo de sa√≠da vair ter 4 vari√°veis explicativas (X1 a X4) e 1 de resposta (Y), exemplo:
  
  
 | X1    | X2    | X3    | X4    | Y     |
@@ -151,19 +151,19 @@ lags <- c(1,2,4,12) # INFORME OS LAGS
 lags <- c(1,2,4,12) # INFORME OS LAGS
 inic <- max(lags)+1 # inicar em 13
 
-nobs <- length(normalizado) # n˙mero de observaÁıes: 107
+nobs <- length(normalizado) # n√∫mero de observa√ß√µes: 107
 # iniciar vetores nulos
 inputs <- c() # PADROES DE ENTRADA
 output <- c() # PADROES DE SAIDA
-indice <- c() # posiÁ„o de cada output no tempo
+indice <- c() # posi√ß√£o de cada output no tempo
 
-# iteraÁ„o que preenche os vetores com as observaÁıes
+# itera√ß√£o que preenche os vetores com as observa√ß√µes
 for (i in inic:nobs) {
   inputs = rbind(inputs,normalizado[i-lags])
   output = c(output,normalizado[i])
   indice = c(indice,i+1)
 
-data.train <- cbind(inputs,output) # PADR’ES ENTRADA/SAÕDA
+data.train <- cbind(inputs,output) # PADR√ïES ENTRADA/SA√çDA
 
 nomes <- c()
 for(i in 1:length(lags)) {
@@ -173,10 +173,10 @@ for(i in 1:length(lags)) {
 colnames(data.train)=c(nomes,"Y")
 
 limites <- c(0,1) 
-p       <- dim(inputs)[2]+1 # n˙mero de vari·veis no modelo
+p       <- dim(inputs)[2]+1 # n√∫mero de vari√°veis no modelo
 
 #original tem um p demais
-#range.data <- matrix(rep(limites,p),2,p) # intervalo de cada vari·vel
+#range.data <- matrix(rep(limites,p),2,p) # intervalo de cada vari√°vel
 range.data <- matrix(rep(limites,p),2)
 }
 ```
@@ -187,20 +187,20 @@ range.data <- matrix(rep(limites,p),2)
  
  
 ```{r}
-npadroes   <- dim(data.train)[1] # calcula o n˙mero de padrıes para o an·lise: 95
+npadroes   <- dim(data.train)[1] # calcula o n√∫mero de padr√µes para o an√°lise: 95
 
-noutsample <- 12 # escolhe o tamanho da previs„o...12
+noutsample <- 12 # escolhe o tamanho da previs√£o...12
 
-ninsample  <- npadroes-noutsample # n˙mero de padrıes de treino
+ninsample  <- npadroes-noutsample # n√∫mero de padr√µes de treino
 ```
 
 
 
 #------------------------------------------------------------------------------
- Processamento da ST com rede neural, usando o pacote neuralnet vers„o 1.33. O pacote treina redes neurais com backpropagation
+ Processamento da ST com rede neural, usando o pacote neuralnet vers√£o 1.33. O pacote treina redes neurais com backpropagation
 
  TREINA REDE FEEDFORWARD  
- Ser„o usadas 8 camadas escondidas, valor que foi o melhor encontrado depois de testar de 3 a 10 camadas. Os padrıes a serem usados s„o os primeiros 84 (1:ninsample) valores observados.
+ Ser√£o usadas 8 camadas escondidas, valor que foi o melhor encontrado depois de testar de 3 a 10 camadas. Os padr√µes a serem usados s√£o os primeiros 84 (1:ninsample) valores observados.
  
 
 
@@ -212,7 +212,7 @@ modelo_nn <- neuralnet(formula     = Y ~ X1 + X2 + X3 + X4,
 ```
 
 
-## Gr·fico da rede neural
+## Gr√°fico da rede neural
  
  
 ```{r}
@@ -229,12 +229,12 @@ plot(modelo_nn,
 
 
 
- PREVIS√O INSAMPLE
+ PREVIS√ÉO INSAMPLE
  
  
-Feito o modelo, vamos fazer uma previs„o com o modelo calculado, sobre os prÛprios dados de treinamento (previs„o insample de 84 dados).
+Feito o modelo, vamos fazer uma previs√£o com o modelo calculado, sobre os pr√≥prios dados de treinamento (previs√£o insample de 84 dados).
 
-Essa previs„o vai servir para testar a precis„o do modelo calculado
+Essa previs√£o vai servir para testar a precis√£o do modelo calculado
 
 
 ```{r}
@@ -244,7 +244,7 @@ previsao <- compute (modelo_nn,
 plot (output[1:ninsample],
      xlab = "Indice do valor",
      ylab = "Valores observados",
-     main = "Valores observados normalizados vs linha de previs„o",
+     main = "Valores observados normalizados vs linha de previs√£o",
      pch  = 19)
 
 lines (1:ninsample, 
@@ -254,7 +254,7 @@ lines (1:ninsample,
 ```
 
 
- Vamos agora fazer a previs„o da sÈrie sobre o log de valores reais previs„o do log passageiros 1 passo a frente
+ Vamos agora fazer a previs√£o da s√©rie sobre o log de valores reais previs√£o do log passageiros 1 passo a frente
  
  
 ```{r}
@@ -268,7 +268,7 @@ for (i in 1:ninsample) {
 plot(logst_Vendas[indice[1]:indice[ninsample]],
      xlab = "Indice do valor",
      ylab = "log(Valores)",
-     main = "log(valores observados) vs linha de previs„o",
+     main = "log(valores observados) vs linha de previs√£o",
      pch  = 19)
 
 lines(1:ninsample, 
@@ -279,7 +279,7 @@ lines(1:ninsample,
 
 
 
- Previs„o de vendas do comercio varejista 1 passo a frente
+ Previs√£o de vendas do comercio varejista 1 passo a frente
  
  
 ```{r}
@@ -292,7 +292,7 @@ MAPE_INSAMPLE = round(100*mean(abs(st_Vendas[indice[1]:indice[ninsample]] -
 ```
 
 
- Plotagem da sÈrie com indicadores de precis„o
+ Plotagem da s√©rie com indicadores de precis√£o
  
  
 ```{r}
@@ -305,7 +305,7 @@ y_plot2 <- y_plot*.95
 plot (st_Vendas[indice[1]:indice[ninsample]],
      xlab = "Indice",
      ylab = "Volume de vendas",
-     main = "Linha de previs„o de vendas do comerico varejista
+     main = "Linha de previs√£o de vendas do comerico varejista
      Dados de Treinamento",
      pch  = 19)
 
@@ -322,11 +322,11 @@ text(x_plot,y_plot2, paste0("MAPE = ",MAPE_INSAMPLE," %"))
 
 
 #------------------------------------------------------------------------------
- PREVIS√O OUTSAMPLE 
+ PREVIS√ÉO OUTSAMPLE 
  
  
- Vamos fazer agora a previs„o sobre os valores que n„o foram usados para treinar o modelo, ou seja os ˙ltimos 12 valores do ano 2011 (indices 84 a 95 dos dados de data.train)
-previs„o da diferenÁa do log
+ Vamos fazer agora a previs√£o sobre os valores que n√£o foram usados para treinar o modelo, ou seja os √∫ltimos 12 valores do ano 2011 (indices 84 a 95 dos dados de data.train)
+previs√£o da diferen√ßa do log
 
 
 ```{r}
@@ -337,7 +337,7 @@ plot((ninsample + 1):(ninsample + noutsample),
      output[(ninsample + 1):(ninsample + noutsample)],
      xlab = "Indice do valor",
      ylab = "log(Valores)",
-     main = "log(valores observados) vs linha de previs„o",
+     main = "log(valores observados) vs linha de previs√£o",
      pch  = 19)
 
 lines((ninsample+1):(ninsample+noutsample),
@@ -349,7 +349,7 @@ lines((ninsample+1):(ninsample+noutsample),
 
 
 
- previs„o do log 1 passo a frente
+ previs√£o do log 1 passo a frente
  
  
  
@@ -367,7 +367,7 @@ plot(indice[ninsample+1]:indice[ninsample+noutsample],
      ylim = c(5,5.6),
      xlab = "Indice do valor",
      ylab = "log(Valores)",
-     main = "log(valores observados) vs linha de previs„o
+     main = "log(valores observados) vs linha de previs√£o
      12 meses a frente",
      pch  = 19)
 
@@ -378,7 +378,7 @@ lines(indice[ninsample+1]:indice[ninsample+noutsample],
 ```
 
 
- previs„o de vendas 1 passo a frente
+ previs√£o de vendas 1 passo a frente
  
  
 
@@ -402,7 +402,7 @@ plot (indice[ninsample+1]:indice[ninsample+noutsample],
      st_Vendas[indice[ninsample + 1]:indice[ninsample + noutsample]],
      xlab = "Indice",
      ylab = "Volume vendas",
-     main = "Previs„o de vendas do comercio varejista
+     main = "Previs√£o de vendas do comercio varejista
      Ano de 2011 - Dados de Teste",
      ylim = c(160,250))
 
@@ -412,7 +412,7 @@ lines(indice[ninsample + 1]:indice[ninsample + noutsample],
       col = "red")
 
 
-# Plotar Indicadores de precis„o
+# Plotar Indicadores de precis√£o
 text(x_plot, y_plot, 
      paste0("MAD = ",MAD))
 text(x_plot,y_plot2, 
@@ -421,7 +421,7 @@ text(x_plot,y_plot2,
 
 
 
-Fazer uma sÈrie temporal com a previs„o e exportar o arquivo
+Fazer uma s√©rie temporal com a previs√£o e exportar o arquivo
 
 
 ```{r}
@@ -447,7 +447,7 @@ write.csv2(prev_vendas_2011,
 ```
 
 
-# Fim do an·lise
+# Fim do an√°lise
 
 ```{r}
 date()

@@ -1,0 +1,222 @@
+---
+title: "Machine Learning - Exercício"
+author: "Walter Humberto Subiza Pina"
+date: "22 de novembro de 2016"
+output: 
+  pdf_document: 
+    toc: yes
+---
+# Objetivo do exercício
+Com a base de dados sobre crédito bancário, dividir o conjunto de dados em treino e teste
+e criar uma arvore capaz de detectar se o cliente tem capacidade de pagar um empréstimo.
+Prof: Tiago Mendes Dantas - FGV
+#  Execução
+## Carregando dados e arrumando
+
+```{r }
+setwd("H:/FGV/05 Machine Learning - Tiago")
+load("H:/FGV/05 Machine Learning - Tiago/credito.RData")
+# conhecendo os dados...
+str(credit)
+summary(credit)
+# arrumando algumas variaveis...
+# padronizando Credit.Amount
+credit$Credit.Amount <- scale(credit$Credit.Amount)
+# Foreign.Worker como fator
+credit$Foreign.Worker <- as.factor(credit$Foreign.Worker)
+
+# definicao do tamanho do conjunto teste
+set.seed(1234)
+teste.ind <- sample(1:nrow(credit), size = 600)
+
+# separacao de dados treino e teste
+cred.treino<-credit[teste.ind,]
+cred.teste <- credit[-teste.ind,]
+```
+
+
+# Primeiro método: Árvores de Classificacao
+```{r, warning = FALSE}
+library(tree)
+set.seed(100)
+
+# arvore com todas as variaveis consideradas
+arvore <- tree(Creditability~.,cred.treino)
+
+summary(arvore)
+```
+- As variáveis encontradas mais importantes são:
+    1. Account.Balance
+    2. Payment.Status.of.Previous.Credit
+    3. Duration.of.Credit..month.
+    4. Credit.Amount
+    5. Most.valuable.available.asset
+    6. Sex...Marital.Status
+    7. Purpose
+    8. Length.of.current.employment
+    9. Concurrent.Credits
+
+## Visualizando a arvore com 20 nós
+```{r, warning = FALSE, echo=FALSE}
+plot(arvore)
+text(arvore,pretty=0)#comando coloca os nomes das variaveis
+```
+
+
+## Realizando validacao cruzada para identificar o melhor tamanho de arvore
+```{r}
+cv.arvore<-cv.tree(arvore)
+plot(cv.arvore$size,cv.arvore$dev,type="b")
+```
+
+
+## Poda da arvore com 14 nós terminais
+```{r}
+arvore.poda <- prune.tree(arvore, best=14)
+plot(arvore.poda)
+text(arvore.poda, pretty = 0)
+```
+
+## Modelo usado para predecir os novos dados
+```{r}
+pred.arvore <- predict(arvore.poda, newdata = cred.teste)
+# matriz de confusao
+(mat.conf <- table(round(pred.arvore[,2],0), cred.teste$Creditability))
+# taxa de acertos
+acertos.tree <- (round((mat.conf[1,1] + mat.conf[2,2]) / sum(mat.conf),2))*100
+paste0("Taxa de acertos Tree= ", acertos.tree," %")
+```
+
+
+
+# Segundo método: Random Forest
+```{r, warning = FALSE, results= 'asis'}
+ library(randomForest)
+ # Bagging
+ set.seed(100)
+ # 20 é o total de variaveis, entao e bagging...
+ (ajuste.bagging<-randomForest(Creditability~., data=cred.treino, mtry=20)) 
+```
+
+##vamos testar o metodo no conjunto de teste
+```{r, warning = FALSE}
+library(caret)
+pred.bagging<-predict(ajuste.bagging,newdata=cred.teste)
+conf1 <- (confusionMatrix(pred.bagging, cred.teste$Creditability))
+#calculando o mse
+acertos.bag <- postResample(pred.bagging, cred.teste$Creditability)
+paste0("Taxa de acertos modelo Bagging= ", acertos.bag[1]*100," %")
+```
+
+
+## Modelo 2 com algumas variaveis selecionadas (8)
+```{r, warning = FALSE, results='asis'}
+ library(knitr)
+set.seed(100)
+modelo.rf2 <- randomForest(Creditability ~ Account.Balance + Duration.of.Credit..month. +
+                             Payment.Status.of.Previous.Credit + Purpose  +
+                             Guarantors  + Duration.in.Current.address +
+                             Most.valuable.available.asset + Sex...Marital.Status, 
+                           data = cred.treino, importance = TRUE, ntree = 300, nodesize = 1)
+
+#vamos testar o novo metodo no conjunto de teste
+pred.rf2 <-predict(modelo.rf2,newdata=cred.teste)
+conf2 <- (confusionMatrix(pred.rf2, cred.teste$Creditability))
+
+#calculando o mse
+acertos.tree.8 <- postResample(pred.rf2, cred.teste$Creditability)
+paste0("Taxa de acertos modelo Com 8 variaveis = ", acertos.tree.8[1]*100," %")
+
+```
+
+## Agora vamos fazer um modelo com as variaveis que o metodo da arvore (tree) achou mais importantes na predição:
+```{r, results='asis'}
+library(knitr)
+set.seed(100)
+modelo.rf3 <- randomForest(Creditability ~ Account.Balance + Duration.of.Credit..month. +
+                             Payment.Status.of.Previous.Credit + Purpose  + Most.valuable.available.asset +
+                             Sex...Marital.Status + Credit.Amount + 
+                             Length.of.current.employment + Concurrent.Credits, 
+                             data = cred.treino, importance = TRUE, ntree = 300, nodesize = 1)
+
+#vamos testar o novo metodo no conjunto de teste
+pred.rf3 <-predict(modelo.rf3,newdata=cred.teste)
+conf3 <- (confusionMatrix(pred.rf3, cred.teste$Creditability))
+
+#calculando o mse
+acertos.tree.imp <- postResample(pred.rf3, cred.teste$Creditability)
+paste0("Taxa de acertos modelo com variaveis + importantes= ", acertos.tree.imp[1]*100," %")
+```
+
+# Terceiro Método: regressão logistica
+## glm ajusta um modelo linear generalizado, no nosso caso como family=binomial, estamos ajustando um modelo de regressao logistica
+```{r, warning= FALSE}
+library(ISLR)
+ajuste.glm<-glm(Creditability ~.,
+                data=cred.treino,family=binomial)
+
+summary(ajuste.glm)$coefficients
+
+# funcao predict calcula a probabilidade de Creditability = 1, nao dar calote
+probs.glm<-predict(ajuste.glm, type="response") 
+probs.glm <- ifelse(probs.glm >0.5,"1","0")
+
+#calculo da matriz de confusao
+mat_conf<-table(probs.glm, cred.treino$Creditability)
+#calculo da taxa de acerto do modelo
+acertos.glm <- round(((mat_conf[1,1]+ mat_conf[2,2])/sum(mat_conf)*100),2)
+paste0("Taxa de acertos GLM treino = ", acertos.glm, " %")
+
+# vamos ver no conjunto de teste
+probs.glm.teste <- predict(ajuste.glm, newdata = cred.teste, type="response") 
+pred.glm <- ifelse(probs.glm.teste >0.5,"1","0")
+
+# matriz de confusao e taxa de acertos...
+mat_conf<-table(pred.glm, cred.teste$Creditability)
+
+acertos.glm.teste <- ((mat_conf[1,1]+mat_conf[2,2])/sum(mat_conf))*100
+paste0("Taxa de acertos GLM teste = ", acertos.glm.teste," %")
+
+```
+
+
+# Quarto método Boosting 
+## Agora vamos utilizar o metodo de boosting utilizaremos o pacote gbm como e um problema de regressao devemos colocar como argumento distribution="gaussian", para determinar o numero de arvores a ser considerado utilizamos o argumento n.trees, e o argumento interaction.depth determina o numero maximo de nos das arvores
+
+```{r, warning= FALSE}
+library(gbm)
+set.seed(100)
+ajuste.boosting<-gbm(Creditability~.,data=cred.treino,
+                     distribution = "gaussian",
+                     n.trees=5000,
+                     interaction.depth = 4)
+summary(ajuste.boosting)
+
+#vamos testar o metodo no conjunto de teste
+pred.boosting<-predict(ajuste.boosting, newdata=cred.teste, n.trees = 5000)
+summary(pred.boosting)
+
+real <- cred.teste$Creditability
+predito <- (round((pred.boosting),0)-1)
+
+#calculando o mse
+
+mat_conf<-table(predito,real)
+acertos.boosting <- ((mat_conf[1,1]+mat_conf[2,2])/sum(mat_conf))*100
+paste0("Taxa de acertos Boosting = ", acertos.boosting," %")
+```
+
+# Resultados finais
+```{r, echo = FALSE}
+paste0("Taxa de acertos Tree                      = ", acertos.tree," %")
+paste0("Taxa de acertos modelo Bagging            = ", acertos.bag[1]*100," %")
+paste0("Taxa de acertos modelo Com 8 variaveis    = ", acertos.tree.8[1]*100," %")
+paste0("Taxa de acertos modelo com variaveis imp. = ", acertos.tree.imp[1]*100," %")
+paste0("Taxa de acertos GLM                       = ", acertos.glm.teste," %")
+paste0("Taxa de acertos Boosting                  = ", acertos.boosting," %")
+```
+
+Fim do exercício
+```{r, echo = FALSE}
+date()
+````
